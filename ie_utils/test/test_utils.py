@@ -9,21 +9,21 @@ from utils.constants import SENTRY_DSN_VAR_NAME
 
 
 class TestLogUtils(unittest.TestCase):
-    @mock.patch('utils.os')
+    @mock.patch('ie_utils.os')
     def test_get_logger(self, os_mock):
         os_mock.environ.get.return_value = 'INFO'
         logger = get_logger()
         self.assertEqual('INFO', logging.getLevelName(logger.level))
 
-    @mock.patch('utils.os')
-    @mock.patch('utils.sentry_sdk')
+    @mock.patch('ie_utils.os')
+    @mock.patch('ie_utils.sentry_sdk')
     def test_init_sentry_sdk(self, sentry_sdk_mock, os_mock):
         os_mock.environ = {SENTRY_DSN_VAR_NAME: 'sentry_dsn'}
         init_sentry_sdk()
         self.assertEqual('sentry_dsn', sentry_sdk_mock.init.call_args[1].get('dsn'))
 
-    @mock.patch('utils.init_sentry_sdk')
-    @mock.patch('utils.sentry_sdk.capture_exception')
+    @mock.patch('ie_utils.init_sentry_sdk')
+    @mock.patch('ie_utils.sentry_sdk.capture_exception')
     def test_capture_exception(self, capture_exception_mock, init_sentry_sdk_mock):
         exc = Exception('error')
 
@@ -35,7 +35,7 @@ class TestLogUtils(unittest.TestCase):
 
 
 class TestS3Utils(unittest.TestCase):
-    @mock.patch('utils.boto3')
+    @mock.patch('ie_utils.boto3')
     def test_get_object(self, boto3_mock):
         s3_object_mock = mock.Mock()
         boto3_mock.resource.return_value = s3_object_mock
@@ -46,7 +46,7 @@ class TestS3Utils(unittest.TestCase):
         self.assertEqual('bucket_name', s3_object_mock.Object.call_args[0][0])
         self.assertEqual('file_key', s3_object_mock.Object.call_args[0][1])
 
-    @mock.patch('utils.boto3')
+    @mock.patch('ie_utils.boto3')
     def test_put_object(self, boto3_mock):
         s3_client_mock = mock.Mock()
         boto3_mock.client.return_value = s3_client_mock
@@ -61,7 +61,7 @@ class TestS3Utils(unittest.TestCase):
 
 class TestDynamoDBUtils(unittest.TestCase):
 
-    @mock.patch('utils.DynamoDBUtils.log')
+    @mock.patch('ie_utils.DynamoDBUtils.log')
     def test_log_wrapper(self, log_mock):
         class Test:
             def test(self):
@@ -78,8 +78,8 @@ class TestDynamoDBUtils(unittest.TestCase):
     #   log
     # ------------------------------------------------------------------------------------------------
 
-    @mock.patch('utils.DynamoDBUtils.update_item')
-    @mock.patch('utils.datetime.datetime')
+    @mock.patch('ie_utils.DynamoDBUtils.update_item')
+    @mock.patch('ie_utils.datetime.datetime')
     def test_log(self, datetime_mock, update_item_mock):
         datetime_mock.now.return_value = 'now'
 
@@ -102,7 +102,7 @@ class TestDynamoDBUtils(unittest.TestCase):
             update_item_mock.call_args[1]['ExpressionAttributeValues']
         )
 
-    @mock.patch('utils.get_logger')
+    @mock.patch('ie_utils.get_logger')
     def test_log_table_None(self, get_logger_mock):
         DynamoDBUtils.log(None, 'table_key', 'log description', 'log object')
 
@@ -111,8 +111,8 @@ class TestDynamoDBUtils(unittest.TestCase):
             'table name: None, table key: table_key, log_object: log object',
             get_logger_mock.return_value.error.call_args[0][0])
 
-    @mock.patch('utils.datetime.datetime')
-    @mock.patch('utils.DynamoDBUtils.update_item')
+    @mock.patch('ie_utils.datetime.datetime')
+    @mock.patch('ie_utils.DynamoDBUtils.update_item')
     def test_update_event(self, update_item_mock, datetime_mock):
         datetime_mock.now.return_value = 'now'
 
@@ -136,7 +136,7 @@ class TestDynamoDBUtils(unittest.TestCase):
             update_item_mock.call_args[1]
         )
 
-    @mock.patch('utils.DynamoDBUtils')
+    @mock.patch('ie_utils.DynamoDBUtils')
     def test_update_item(self, dynamo_db_utils_mock):
         table_mock = mock.Mock()
         dynamo_db_utils_mock.get_table.return_value = table_mock
@@ -146,7 +146,7 @@ class TestDynamoDBUtils(unittest.TestCase):
         self.assertEqual('table name', dynamo_db_utils_mock.get_table.call_args[0][0])
         self.assertEqual('arg', table_mock.update_item.call_args[1]['arg'])
 
-    @mock.patch('utils.boto3')
+    @mock.patch('ie_utils.boto3')
     def test_get_table(self, boto3_mock):
         DynamoDBUtils.get_table('table name')
 
@@ -182,7 +182,7 @@ class TestDynamoDBUtils(unittest.TestCase):
                           'status': 'processed'},
                          python_data)
 
-    @mock.patch('utils.DynamoDBUtils.get_table')
+    @mock.patch('ie_utils.DynamoDBUtils.get_table')
     def test_record_exists(self, get_table_mock):
         get_table_mock.return_value.get_item.return_value = ['Item']
         self.assertTrue(DynamoDBUtils.record_exists('table name', 'search key'))
