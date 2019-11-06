@@ -4,7 +4,7 @@ from setuptools import find_packages
 setup(
     name='ieUtils',  # How you named your package folder (MyLib)
     packages=find_packages(exclude=["ie_utils.test"]),  # Chose the same as "name"
-    version='0.2',  # Start with a small number and increase it with every change you make
+    version='0.3',  # Start with a small number and increase it with every change you make
     license='MIT',  # Chose a license from here: https://help.github.com/articles/licensing-a-repository
     description='Utility functions',  # Give a short description about your library
     author='Sinisa Derasevoc',  # Type in your name
