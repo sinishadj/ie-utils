@@ -10,7 +10,7 @@ setup(
     author='Sinisa Derasevic',  # Type in your name
     author_email='sinishadj@gmail.com',  # Type in your E-Mail
     url='https://github.com/sinishadj/ie-utils',  # Provide either the link to your github or to your website
-    download_url='https://github.com/sinishadj/ie-utils/archive/v_03.tar.gz',
+    download_url='https://github.com/sinishadj/ie-utils/archive/v_04.tar.gz',
     keywords=['UTILITIES', 'S3', 'DYNAMO DB'],  # Keywords that define your package best
     install_requires=[
         'boto3==1.9.43',
