@@ -193,3 +193,35 @@ class DynamoDBUtils:
         table = DynamoDBUtils.get_table(table_name)
         item = table.get_item(Key=search_key) if table else None
         return item is not None and 'Item' in item
+
+    @staticmethod
+    def put_item(table_name, entry_data):
+        """
+        Put entry_data into dynamo db table with a given name
+
+        :param table_name:
+        :param entry_data:
+        :return:
+        """
+        table = DynamoDBUtils.get_table(table_name)
+        table and table.put_item(Item=entry_data)
+
+    @staticmethod
+    def get_items_by_search_attr(table_name, search_attr):
+        table = DynamoDBUtils.get_table(table_name)
+        item = table.scan(search_attr) if table else None
+        return item['Items'] if 'Items' in item else None
+
+    @staticmethod
+    # TODO: refactor this method in the main and rest of the base_utils
+    def get_item_by_search_key(table_name, search_key) -> dict:
+        """
+        Checks is a record already exists in dynamo db
+
+        :param table_name: dynamo db table name
+        :param search_key: key to search by
+        :return: Item, if event is present in dynamo db, None otherwise
+        """
+        table = DynamoDBUtils.get_table(table_name)
+        item = table.get_item(Key=search_key) if table else None
+        return item['Item'] if 'Item' in item else None
