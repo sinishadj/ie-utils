@@ -14,27 +14,12 @@ from boto3.dynamodb.types import TypeDeserializer
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 from sentry_sdk.utils import BadDsn
 
-# TODO: replace the import of variables in each inclusion
 from utils.constants import SENTRY_DSN_VAR_NAME, LOGGING_LEVEL_VAR_NAME, DYNAMO_DB_CONFIG_VAR_NAME
 
 
-class InvoiceType:
-    SALE = 'venta'
-    PURCHASE = 'compra'
-    SALE_RECTIFYING = 'rectifica_venta'
-    PURCHASE_RECTIFYING = 'rectifica_compra'
-
-    TYPES = (
-        SALE,
-        PURCHASE,
-        SALE_RECTIFYING,
-        PURCHASE_RECTIFYING
-    )
-
-    SALES = [SALE, SALE_RECTIFYING]
-    PURCHASES = [PURCHASE, PURCHASE_RECTIFYING]
-    RECTIFIES = [SALE_RECTIFYING, PURCHASE_RECTIFYING]
-
+# ---------------------------------------------------------------------------------------------------------------------
+# ---------------------------                Logging utils                                  ---------------------------
+# ---------------------------------------------------------------------------------------------------------------------
 
 def get_logger():
     logger = logging.getLogger()
@@ -58,6 +43,10 @@ def capture_exception(exc):
     init_sentry_sdk()
     sentry_sdk.capture_exception(exc)
 
+
+# ---------------------------------------------------------------------------------------------------------------------
+# ---------------------------                S3 utils                                       ---------------------------
+# ---------------------------------------------------------------------------------------------------------------------
 
 class S3Utils:
     """
@@ -99,6 +88,10 @@ class S3Utils:
             Body=file_bytes
         )
 
+
+# ---------------------------------------------------------------------------------------------------------------------
+# ---------------------------                Dynamo DB utils                                ---------------------------
+# ---------------------------------------------------------------------------------------------------------------------
 
 class DynamoDBUtils:
     """
@@ -206,6 +199,28 @@ class DynamoDBUtils:
         return item is not None and 'Item' in item
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# ---------------------------                Txerpa parse utils                             ---------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+
+class InvoiceType:
+    SALE = 'venta'
+    PURCHASE = 'compra'
+    SALE_RECTIFYING = 'rectifica_venta'
+    PURCHASE_RECTIFYING = 'rectifica_compra'
+
+    TYPES = (
+        SALE,
+        PURCHASE,
+        SALE_RECTIFYING,
+        PURCHASE_RECTIFYING
+    )
+
+    SALES = [SALE, SALE_RECTIFYING]
+    PURCHASES = [PURCHASE, PURCHASE_RECTIFYING]
+    RECTIFIES = [SALE_RECTIFYING, PURCHASE_RECTIFYING]
+
+
 class TxerpadParseUtils:
     @staticmethod
     # TODO: remove this from lambdas that don't need it ~10MB is the size of pycountry library
@@ -243,7 +258,7 @@ class TxerpadParseUtils:
     @staticmethod
     def parse_money(money):
         """
-        Converts money in the text or number format into Decimal
+        Converts money from the text/number format into Decimal
 
         Parameters
         ----------
@@ -279,13 +294,27 @@ class TxerpadParseUtils:
         if invoice_type in InvoiceType.SALES:
             return '%s%s' % (invoice_period, datetime.datetime.strptime(issue_date, date_format).year)
         elif invoice_type in InvoiceType.PURCHASES:
-            curr_month = datetime.datetime.today().month
-            curr_year = datetime.datetime.today().year
-            curr_trimester = (curr_month - 1) // 3
+            today = datetime.datetime.today()
+            curr_trimester = (today.month - 1) // 3 + 1
 
-            year = curr_year if int(invoice_period.replace('T', '')) <= curr_trimester else curr_year - 1
+            year = today.year if int(invoice_period.replace('T', '')) < curr_trimester else today.year - 1
             return '%s%s' % (invoice_period, year)
         return None
+
+    @staticmethod
+    def parse_invoice_date(date):
+        """
+        Converts date to txerpad compatible invoice period
+        Parameters
+        ----------
+        date            date of invoice issue
+
+        Returns         txerpad compatible invoice period
+        -------
+
+        """
+        invoice_trimester = (date.month - 1) // 3 + 1
+        return '%sT%s' % (invoice_trimester, date.year)
 
     @staticmethod
     def parse_tax(invoice_type, tax_type, tax_rate):
@@ -293,9 +322,9 @@ class TxerpadParseUtils:
         Gets corresponding txerpad tax_code depending on the input parameters
         Parameters
         ----------
-        invoice_type
-        tax_type
-        tax_rate
+        invoice_type        type of the invoice, e.g. venta
+        tax_type            type of the tax, IVA or IRPF
+        tax_rate            rate of the tax, e.g., 0.5
 
         Returns
         -------
