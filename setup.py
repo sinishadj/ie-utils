@@ -2,7 +2,7 @@ from distutils.core import setup
 from setuptools import find_packages
 
 setup(
-    name='ie_utils',  # How you named your package folder
+    name='ieUtils',  # How you named your package folder
     packages=find_packages(exclude=["ie_utils.test"]),  # Chose the same as "name"
     version='0.4',  # Start with a small number and increase it with every change you make
     license='MIT',  # Chose a license from here: https://help.github.com/articles/licensing-a-repository
