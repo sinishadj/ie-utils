@@ -10,7 +10,7 @@ setup(
     author='Sinisa Derasevoc',  # Type in your name
     author_email='sinishadj@gmail.com',  # Type in your E-Mail
     url='https://github.com/sinishadj/ie-utils',  # Provide either the link to your github or to your website
-    download_url='https://github.com/sinishadj/ie-utils/archive/v_02.tar.gz',
+    download_url='https://github.com/sinishadj/ie-utils/archive/v_03.tar.gz',
     keywords=['UTILITIES', 'S3', 'DYNAMO DB', 'TXERPA'],  # Keywords that define your package best
     install_requires=[  # I get to this in a second
         'boto3==1.9.43',
