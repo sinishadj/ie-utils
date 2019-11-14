@@ -6,7 +6,7 @@ import os
 
 import boto3
 import sentry_sdk
-from boto3.dynamodb.types import TypeDeserializer
+from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 from sentry_sdk.utils import BadDsn
 
@@ -174,12 +174,14 @@ class DynamoDBUtils:
         return dynamo_db.Table(table_name)
 
     @staticmethod
-    def deserialize_python_data(record) -> dict:
+    def deserialize_to_python_data(dynamo_db_dict: dict) -> dict:
         deserializer = TypeDeserializer()
-        return {
-            k: deserializer.deserialize(v) for k, v in
-            record.get(DynamoDBUtils.DYNAMO_DB_RESOURCE_NAME).get('NewImage').items()
-        }
+        return {k: deserializer.deserialize(v) for k, v in dynamo_db_dict.items()}
+
+    @staticmethod
+    def serialize_python_data(python_data: dict) -> dict:
+        serializer = TypeSerializer()
+        return {k: serializer.serialize(v) for k, v in python_data.items()}
 
     @staticmethod
     def record_exists(table_name, search_key) -> bool:
@@ -213,10 +215,9 @@ class DynamoDBUtils:
         return item['Items'] if 'Items' in item else None
 
     @staticmethod
-    # TODO: refactor this method in the main and rest of the base_utils
     def get_item_by_search_key(table_name, search_key) -> dict:
         """
-        Checks is a record already exists in dynamo db
+        Get item from dynamo db by search_key
 
         :param table_name: dynamo db table name
         :param search_key: key to search by

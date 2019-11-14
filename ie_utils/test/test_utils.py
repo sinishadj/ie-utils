@@ -3,9 +3,9 @@ import unittest
 
 import mock
 
-from utils import get_logger, init_sentry_sdk, S3Utils, DynamoDBUtils, \
+from ie_utils import get_logger, init_sentry_sdk, S3Utils, DynamoDBUtils, \
     capture_exception
-from utils.constants import SENTRY_DSN_VAR_NAME
+from ie_utils.constants import SENTRY_DSN_VAR_NAME
 
 
 class TestLogUtils(unittest.TestCase):
@@ -73,10 +73,6 @@ class TestDynamoDBUtils(unittest.TestCase):
 
         self.assertEqual('test', test_class_instance.test())
         self.assertEqual(2, log_mock.call_count)
-
-    # ------------------------------------------------------------------------------------------------
-    #   log
-    # ------------------------------------------------------------------------------------------------
 
     @mock.patch('ie_utils.DynamoDBUtils.update_item')
     @mock.patch('ie_utils.datetime.datetime')
@@ -154,23 +150,18 @@ class TestDynamoDBUtils(unittest.TestCase):
         self.assertEqual('table name', boto3_mock.resource.return_value.Table.call_args[0][0])
 
     def test_deserialize_python_data(self):
-        records = {
-            'eventName': 'INSERT',
-            'dynamodb': {
-                'NewImage': {
-                    'identifier': {'S': 'id'},
-                    "source": {'S': "stripe"},
-                    'date_time': {'S': '2019-05-31'},
-                    'status': {'S': 'processed'},
-                    'body': {'S': '{"test":"test"}'},
-                    'external_id': {'S': 'external_id'},
-                    'message': {'S': 'no error message'},
-                    'processed_at': {'S': '2019-05-31'}
-                }
-            }
+        dynamo_db_dict = {
+            'identifier': {'S': 'id'},
+            "source": {'S': "stripe"},
+            'date_time': {'S': '2019-05-31'},
+            'status': {'S': 'processed'},
+            'body': {'S': '{"test":"test"}'},
+            'external_id': {'S': 'external_id'},
+            'message': {'S': 'no error message'},
+            'processed_at': {'S': '2019-05-31'}
         }
 
-        python_data = DynamoDBUtils.deserialize_python_data(records)
+        python_data = DynamoDBUtils.deserialize_to_python_data(dynamo_db_dict)
 
         self.assertEqual({'body': '{"test":"test"}',
                           'date_time': '2019-05-31',
@@ -182,7 +173,51 @@ class TestDynamoDBUtils(unittest.TestCase):
                           'status': 'processed'},
                          python_data)
 
+    def test_serialize_python_data(self):
+        python_data = {
+            'body': '{"test":"test"}',
+            'date_time': '2019-05-31',
+            'external_id': 'external_id',
+            'identifier': 'id1',
+            'message': 'no error message',
+            'processed_at': '2019-05-31',
+            'source': 'stripe',
+            'status': 'processed'
+        }
+
+        dynamo_db_dict = DynamoDBUtils.serialize_python_data(python_data)
+
+        self.assertEqual({'identifier': {'S': 'id1'},
+                          "source": {'S': "stripe"},
+                          'date_time': {'S': '2019-05-31'},
+                          'status': {'S': 'processed'},
+                          'body': {'S': '{"test":"test"}'},
+                          'external_id': {'S': 'external_id'},
+                          'message': {'S': 'no error message'},
+                          'processed_at': {'S': '2019-05-31'}
+                          },
+                         dynamo_db_dict)
+
     @mock.patch('ie_utils.DynamoDBUtils.get_table')
     def test_record_exists(self, get_table_mock):
         get_table_mock.return_value.get_item.return_value = ['Item']
         self.assertTrue(DynamoDBUtils.record_exists('table name', 'search key'))
+
+    @mock.patch('ie_utils.DynamoDBUtils.get_table')
+    def test_put_item(self, get_table_mock):
+        DynamoDBUtils.put_item('table', {'data_item': 'test'})
+
+        get_table_mock.assert_called()
+        self.assertEqual('table', get_table_mock.call_args[0][0])
+        self.assertEqual({'Item': {'data_item': 'test'}}, get_table_mock.return_value.put_item.call_args[1])
+
+    @mock.patch('ie_utils.DynamoDBUtils.get_table')
+    def test_get_item_by_search_key(self, get_table_mock):
+        get_table_mock.return_value.get_item.return_value = {'Item': 'item'}
+
+        result = DynamoDBUtils.get_item_by_search_key('table', {'data_item': 'test1'})
+
+        get_table_mock.assert_called()
+        self.assertEqual('table', get_table_mock.call_args[0][0])
+        self.assertEqual({'Key': {'data_item': 'test1'}}, get_table_mock.return_value.get_item.call_args[1])
+        self.assertEqual('item', result)
