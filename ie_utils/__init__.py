@@ -6,6 +6,7 @@ import os
 
 import boto3
 import sentry_sdk
+from boto3.dynamodb.conditions import Attr
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 from sentry_sdk.utils import BadDsn
@@ -209,9 +210,9 @@ class DynamoDBUtils:
         table and table.put_item(Item=entry_data)
 
     @staticmethod
-    def get_items_by_search_attr(table_name, search_attr):
+    def get_items_by_search_attr(table_name, key, value):
         table = DynamoDBUtils.get_table(table_name)
-        item = table.scan(search_attr) if table else None
+        item = table.scan(FilterExpression=Attr(key).eq(value)) if table else None
         return item['Items'] if 'Items' in item else None
 
     @staticmethod
