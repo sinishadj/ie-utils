@@ -3,6 +3,7 @@ import inspect
 import json
 import logging
 import os
+import uuid
 
 import boto3
 import sentry_sdk
@@ -227,3 +228,77 @@ class DynamoDBUtils:
         table = DynamoDBUtils.get_table(table_name)
         item = table.get_item(Key=search_key) if table else None
         return item['Item'] if 'Item' in item else None
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# ---------------------------            CloudWatch utils                                   ---------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+
+def create_cloud_watch_cron_rule(cron_expression, lambda_function, lambda_json_input, description):
+    """
+    Create a cron rule and a lambda trigger
+    """
+
+    cron_rule_name = 'Rule_{}'.format(uuid.uuid4().hex)
+    cloud_watch_client = boto3.client('events')
+    rule_arn = cloud_watch_client.put_rule(
+        Name=cron_rule_name,
+        ScheduleExpression=cron_expression,
+        State='ENABLED',
+        Description=description
+    )['RuleArn']
+    get_logger().info(f'Rule {cron_rule_name} created, and scheduled for {cron_expression}')
+
+    statement_id = f'{lambda_function}-stmt-id-{str(uuid.uuid4())}'
+
+    lambda_client = boto3.client('lambda')
+    lambda_arn = lambda_client.get_function(FunctionName=lambda_function)['Configuration']['FunctionArn']
+    cloud_watch_client.put_targets(
+        Rule=cron_rule_name,
+        Targets=[
+            {
+                'Id': cron_rule_name,
+                'Arn': lambda_arn,
+                'Input': json.dumps(lambda_json_input)
+            },
+        ]
+    )
+    get_logger().info(f'Target for rule {cron_rule_name} added')
+
+    lambda_client.add_permission(
+        FunctionName=lambda_function,
+        StatementId=statement_id,
+        Action='lambda:InvokeFunction',
+        SourceArn=rule_arn,
+        Principal='events.amazonaws.com'
+    )
+    get_logger().info(f'Permission with id {statement_id} added for rule {cron_rule_name}')
+
+    return cron_rule_name, statement_id
+
+
+def delete_cloud_watch_cron_rule(rule_name, statement_id, function_name):
+    """
+    Delete a cron rule and a lambda trigger
+    """
+
+    if rule_name:
+        cloud_watch_client = boto3.client('events')
+        lambda_client = boto3.client('lambda')
+
+        cloud_watch_client.remove_targets(
+            Rule=rule_name,
+            Ids=[it['Id'] for it in cloud_watch_client.list_targets_by_rule(Rule=rule_name)['Targets']],
+            Force=True
+        )
+        cloud_watch_client.delete_rule(
+            Name=rule_name,
+            Force=True
+        )
+        get_logger().info(f'Rule {rule_name} deleted')
+
+        lambda_client.remove_permission(
+            FunctionName=function_name,
+            StatementId=statement_id
+        )
+        get_logger().info(f'Permission {statement_id} deleted')
