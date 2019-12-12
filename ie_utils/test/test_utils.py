@@ -1,14 +1,15 @@
 import logging
-import unittest
+from unittest import TestCase
 
 import mock
+from boto3.dynamodb.conditions import Attr
 
 from ie_utils import get_logger, init_sentry_sdk, S3Utils, DynamoDBUtils, \
-    capture_exception
+    capture_exception, delete_cloud_watch_cron_rule, create_cloud_watch_cron_rule
 from ie_utils.constants import SENTRY_DSN_VAR_NAME
 
 
-class TestLogUtils(unittest.TestCase):
+class TestLogUtils(TestCase):
     @mock.patch('ie_utils.os')
     def test_get_logger(self, os_mock):
         os_mock.environ.get.return_value = 'INFO'
@@ -34,7 +35,7 @@ class TestLogUtils(unittest.TestCase):
         self.assertEqual(exc, capture_exception_mock.call_args[0][0])
 
 
-class TestS3Utils(unittest.TestCase):
+class TestS3Utils(TestCase):
     @mock.patch('ie_utils.boto3')
     def test_get_object(self, boto3_mock):
         s3_object_mock = mock.Mock()
@@ -59,7 +60,7 @@ class TestS3Utils(unittest.TestCase):
         self.assertEqual('bytes'.encode('utf-8'), s3_client_mock.put_object.call_args[1]['Body'])
 
 
-class TestDynamoDBUtils(unittest.TestCase):
+class TestDynamoDBUtils(TestCase):
 
     @mock.patch('ie_utils.DynamoDBUtils.log')
     def test_log_wrapper(self, log_mock):
@@ -212,6 +213,20 @@ class TestDynamoDBUtils(unittest.TestCase):
         self.assertEqual({'Item': {'data_item': 'test'}}, get_table_mock.return_value.put_item.call_args[1])
 
     @mock.patch('ie_utils.DynamoDBUtils.get_table')
+    def test_get_items_by_search_attr(self, get_table_mock):
+        get_table_mock.return_value.scan.return_value = {'Items': ['items']}
+
+        result = DynamoDBUtils.get_items_by_search_attr('table', 'data_item', 'test1')
+
+        get_table_mock.assert_called()
+        self.assertEqual('table', get_table_mock.call_args[0][0])
+        self.assertEqual(
+            {'FilterExpression': Attr('data_item').eq('test1')},
+            get_table_mock.return_value.scan.call_args[1]
+        )
+        self.assertEqual(['items'], result)
+
+    @mock.patch('ie_utils.DynamoDBUtils.get_table')
     def test_get_item_by_search_key(self, get_table_mock):
         get_table_mock.return_value.get_item.return_value = {'Item': 'item'}
 
@@ -221,3 +236,69 @@ class TestDynamoDBUtils(unittest.TestCase):
         self.assertEqual('table', get_table_mock.call_args[0][0])
         self.assertEqual({'Key': {'data_item': 'test1'}}, get_table_mock.return_value.get_item.call_args[1])
         self.assertEqual('item', result)
+
+
+class TestCloudWatchUtils(TestCase):
+    @mock.patch('ie_utils.boto3')
+    @mock.patch('ie_utils.uuid.uuid4')
+    def test_create_cloud_watch_cron_rule(self, uuid4_mock, boto3_mock):
+        uuid4_mock.return_value.hex = 'hex'
+        boto3_mock.client('lambda').get_function.return_value = {
+            'Configuration': {
+                'FunctionArn': 'FunctionArn'
+            }
+        }
+        boto3_mock.client('events').put_rule.return_value = {
+            'RuleArn': 'RuleArn'
+        }
+
+        result = create_cloud_watch_cron_rule('cron_expression', 'lambda_function', 'lambda_json_input', 'description')
+
+        self.assertEqual(('Rule_hex', 'lambda_function-stmt-id-hex'), result)
+        self.assertEqual({
+            'Name': 'Rule_hex',
+            'ScheduleExpression': 'cron_expression',
+            'State': 'ENABLED',
+            'Description': 'description'
+        }, boto3_mock.client('events').put_rule.call_args[1])
+
+        self.assertEqual({
+            'Rule': 'Rule_hex',
+            'Targets': [{
+                'Id': 'Rule_hex',
+                'Arn': "FunctionArn",
+                'Input': '"lambda_json_input"'
+            }]
+        }, boto3_mock.client('events').put_targets.call_args[1])
+
+        self.assertEqual({
+            'FunctionName': 'lambda_function',
+            'StatementId': 'lambda_function-stmt-id-hex',
+            'Action': 'lambda:InvokeFunction',
+            'SourceArn': "RuleArn",
+            'Principal': 'events.amazonaws.com'
+        }, boto3_mock.client('lambda').add_permission.call_args[1])
+
+    @mock.patch('ie_utils.boto3')
+    def test_delete_cloud_watch_cron_rule(self, boto3_mock):
+        boto3_mock.client('events').list_targets_by_rule.return_value = {
+            'Targets': [{'Id': 'id'}]
+        }
+
+        delete_cloud_watch_cron_rule('rule_name', 'statement_id', 'function_name')
+
+        self.assertEqual({
+            'Rule': 'rule_name',
+            'Ids': ['id'],
+            'Force': True
+        }, boto3_mock.client('events').remove_targets.call_args[1])
+
+        self.assertEqual({
+            'Name': 'rule_name',
+            'Force': True
+        }, boto3_mock.client('events').delete_rule.call_args[1])
+
+        self.assertEqual({
+            'FunctionName': 'function_name',
+            'StatementId': 'statement_id'
+        }, boto3_mock.client('lambda').remove_permission.call_args[1])

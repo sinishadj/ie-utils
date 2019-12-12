@@ -250,7 +250,7 @@ def create_cloud_watch_cron_rule(cron_expression, lambda_function, lambda_json_i
     )['RuleArn']
     get_logger().info(f'Rule {cron_rule_name} created, and scheduled for {cron_expression}')
 
-    statement_id = f'{lambda_function}-stmt-id-{str(uuid.uuid4())}'
+    statement_id = f'{lambda_function}-stmt-id-{uuid.uuid4().hex}'
     if attach_rule_data:
         json_body = json.loads(lambda_json_input.get("body"))
         json_body.update({"cron_rule_name": cron_rule_name})
