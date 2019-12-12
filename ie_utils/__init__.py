@@ -234,7 +234,8 @@ class DynamoDBUtils:
 # ---------------------------            CloudWatch utils                                   ---------------------------
 # ---------------------------------------------------------------------------------------------------------------------
 
-def create_cloud_watch_cron_rule(cron_expression, lambda_function, lambda_json_input, description):
+def create_cloud_watch_cron_rule(cron_expression, lambda_function, lambda_json_input, description,
+                                 attach_rule_data=False):
     """
     Create a cron rule and a lambda trigger
     """
@@ -250,6 +251,11 @@ def create_cloud_watch_cron_rule(cron_expression, lambda_function, lambda_json_i
     get_logger().info(f'Rule {cron_rule_name} created, and scheduled for {cron_expression}')
 
     statement_id = f'{lambda_function}-stmt-id-{str(uuid.uuid4())}'
+    if attach_rule_data:
+        json_body = json.loads(lambda_json_input.get("body"))
+        json_body.update({"cron_rule_name": cron_rule_name})
+        json_body.update({"statement_id": statement_id})
+        lambda_json_input['body'] = json.dumps(json_body)
 
     lambda_client = boto3.client('lambda')
     lambda_arn = lambda_client.get_function(FunctionName=lambda_function)['Configuration']['FunctionArn']
