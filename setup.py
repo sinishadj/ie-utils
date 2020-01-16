@@ -14,7 +14,7 @@ setup(
     keywords=['UTILITIES', 'S3', 'DYNAMO DB'],  # Keywords that define your package best
     install_requires=[
         'boto3',
-        'sentry-sdk'
+        'sentry-sdk==0.9.5'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
