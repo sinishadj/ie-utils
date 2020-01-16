@@ -13,8 +13,8 @@ setup(
     download_url='https://github.com/sinishadj/ie-utils/archive/v_05.tar.gz',
     keywords=['UTILITIES', 'S3', 'DYNAMO DB'],  # Keywords that define your package best
     install_requires=[
-        'boto3==1.9.43',
-        'sentry-sdk==0.9.5'
+        'boto3',
+        'sentry-sdk'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
